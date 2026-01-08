@@ -1,91 +1,162 @@
 import streamlit as st
 
-# --- 頁面設定 ---
-st.set_page_config(page_title="醫藥行銷視覺生成器 v2.0", page_icon="💊", layout="wide")
+# --- 1. 頁面全域設定 ---
+st.set_page_config(page_title="Pharma Visual Prompter", page_icon="💊", layout="wide")
 
-st.title("💊 Pharma Visual Prompter v2.0")
-st.markdown("---")
+# --- 2. 質感設計 (CSS Injection) ---
+# 這裡使用 HTML/CSS 來調整標題樣式，隱藏預設醜醜的選單，提升質感
+st.markdown("""
+<style>
+    /* 標題樣式 */
+    .main-title {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #2C3E50;
+        text-align: center;
+        margin-bottom: 0px;
+    }
+    .version-tag {
+        font-size: 1rem;
+        color: #95A5A6;
+        font-weight: 400;
+        vertical-align: super;
+    }
+    .sub-title {
+        text-align: center;
+        color: #7F8C8D;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+    /* 按鈕樣式 */
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        height: 3em;
+        font-weight: bold;
+        background-color: #2980B9; /* 專業藍 */
+        color: white;
+    }
+    /* 輸入框優化 */
+    .stTextArea textarea {
+        border-radius: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# --- 側邊欄：進階參數設定 ---
+# --- 3. 標題區 (使用自訂 HTML) ---
+st.markdown('<div class="main-title">Pharma Visual Prompter <span class="version-tag">v4.0</span></div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">醫藥行銷專用 AI 指令生成器 | 台灣在地化版 🇹🇼</div>', unsafe_allow_html=True)
+
+# --- 4. 側邊欄：結構設定 ---
 with st.sidebar:
-    st.header("🎨 視覺參數面板")
+    st.header("⚙️ 參數設定")
     
-    # 1. 行銷場景 (更新版)
+    # 場景選擇
     scenario = st.selectbox(
         "行銷場景 (Scenario)",
-        ["民眾衛教 (Public Education)", 
-         "醫療人員專業溝通 (HCP Communication)", 
-         "品牌形象 (Brand Image)"]
+        ["民眾衛教 (Public Awareness)", "醫護專業溝通 (HCP Professional)", "品牌形象 (Brand Image)", "患者旅程 (Patient Journey)"]
     )
 
-    # 2. 藝術風格
+    # 風格選擇
     style = st.selectbox(
         "藝術風格 (Art Style)",
-        ["寫實攝影 (Photorealistic)", 
-         "3D 醫療渲染 (3D Medical Render)", 
-         "極簡向量圖 (Minimalist Vector)", 
-         "溫暖插畫風 (Warm Illustration)"]
+        ["寫實攝影 (Photorealistic)", "3D 醫療渲染 (3D Render)", "溫暖手繪風 (Warm Illustration)", "極簡資訊圖表 (Infographic)"]
     )
     
-    # 3. 圖片比例 (新增特殊比例)
+    # 比例選擇
     ar_label = st.selectbox(
         "圖片比例 (Aspect Ratio)",
-        ["橫式 16:9 (簡報/影片)", 
-         "直式 9:16 (IG Reels/限動)", 
-         "正方形 1:1 (FB/IG 貼文)", 
-         "細長型 9:20 (手機滿版活動頁)", 
-         "寬扁型 20:9 (網站 Banner header)"]
+        ["橫式 16:9 (簡報/影片)", "直式 9:16 (IG Reels/限動)", "正方形 1:1 (社群貼文)", "寬扁型 20:9 (網站 Banner)"]
     )
     
-    # 建立比例對照表 (Mapping)
     ar_map = {
         "橫式 16:9 (簡報/影片)": "--ar 16:9",
         "直式 9:16 (IG Reels/限動)": "--ar 9:16",
-        "正方形 1:1 (FB/IG 貼文)": "--ar 1:1",
-        "細長型 9:20 (手機滿版活動頁)": "--ar 9:20",
-        "寬扁型 20:9 (網站 Banner header)": "--ar 20:9"
+        "正方形 1:1 (社群貼文)": "--ar 1:1",
+        "寬扁型 20:9 (網站 Banner)": "--ar 20:9"
     }
-
-# --- 主畫面：輸入區 ---
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.subheader("1. 描述您的畫面")
-    main_subject = st.text_area("主體描述 (Subject)", height=100, placeholder="例如：一位專業醫師正在向患者解釋病情，手持平板電腦，光線明亮專業...")
     
-with col2:
-    st.subheader("2. 設定氛圍")
-    color_tone = st.text_input("色調與氣氛", placeholder="例如：醫療藍、信任感、科技銀")
-    lighting = st.text_input("光影設定", placeholder="例如：自然光、手術室聚光、柔和晨光", value="Professional studio lighting")
+    st.markdown("---")
+    # 法規開關 (預設開啟)
+    compliance_check = st.checkbox("✅ 啟用 Compliance 防護 (排除血腥/變形)", value=True)
+    negative_prompt = "--no blood, gore, scary, deformity, extra fingers, text, watermark, pills spilling, messy background"
 
-# --- 核心邏輯：Prompt 組合 ---
-if st.button("✨ 生成高階指令 (Generate Prompt)", type="primary"):
-    
-    # 根據新場景設定「魔法詞」(Magic Words)
-    magic_words = ""
-    
-    if "民眾衛教" in scenario:
-        # 衛教：強調親切、易懂、不可怕
-        magic_words = "friendly, easy to understand infographic style, warm atmosphere, hopeful, educational, clean composition"
-    elif "醫療人員" in scenario:
-        # HCP：強調科學、精確、微距、高細節
-        magic_words = "scientific visualization, mode of action (MOA), molecular detail, macro photography, clinical accuracy, unreal engine 5 render, hyper-detailed"
-    elif "品牌形象" in scenario:
-        # 品牌：強調大氣、抽象、高級感
-        magic_words = "cinematic lighting, award-winning photography, emotional connection, high-end, abstract concept, depth of field, 8k resolution"
+# --- 5. 主操作區 ---
+# 使用 container 增加版面層次感
+with st.container():
+    col1, col2 = st.columns([1.5, 1])
 
-    # 組合最終指令
-    final_prompt = f"/imagine prompt: **Subject:** {main_subject}. **Context:** {scenario}. **Style:** {style}. **Atmosphere:** {color_tone}, {lighting}. **Tech Specs:** {magic_words} {ar_map[ar_label]} --v 6.0 --stylize 250"
+    with col1:
+        st.subheader("1. 畫面主體描述")
+        main_subject = st.text_area(
+            "請描述畫面內容 (Subject)", 
+            height=150, 
+            placeholder="例如：一位年輕的藥師正在向老年患者解釋用藥，場景在明亮的社區藥局，氣氛親切..."
+        )
 
-    # --- 顯示結果區域 ---
-    st.divider()
-    st.success("🎉 指令已生成！請複製下方文字：")
-    
-    # 使用 code block 方便複製
-    st.code(final_prompt, language="markdown")
-    
-    # 顯示參數解析 (讓您確認 AI 加了什麼料)
-    with st.expander("查看 AI 自動加入的參數細節"):
-        st.write(f"🔹 **選定場景：** {scenario}")
-        st.write(f"🔹 **自動加入魔法詞：** `{magic_words}`")
-        st.write(f"🔹 **比例參數：** `{ar_map[ar_label]}`")
+    with col2:
+        st.subheader("2. 氛圍定調")
+        
+        # 改為選單式，不再手動輸入
+        color_theme = st.selectbox(
+            "選擇色調與氣氛 (Color & Mood)",
+            [
+                "🏥 專業信任 (Medical Blue & White) - 適合醫師溝通",
+                "☀️ 溫暖療癒 (Warm Orange & Sunlight) - 適合衛教/家庭",
+                "🌿 自然清新 (Green & Clean Nature) - 適合預防醫學",
+                "🧬 科技未來 (Silver & Neon Cyan) - 適合新機轉/研討會",
+                "🛡️ 警示防護 (Red & Gold) - 適合強調風險或保護",
+                "🌫️ 柔和低飽和 (Muted Pastel) - 適合女性/兒童議題"
+            ]
+        )
+        
+        # 顯示當前設定摘要
+        st.info(f"📍 自動鎖定：台灣面孔 (Taiwanese/Asian)")
+
+# --- 6. 核心生成邏輯 ---
+if st.button("✨ 生成 Prompt", type="primary"):
+    if not main_subject:
+        st.error("請先輸入畫面描述！")
+    else:
+        # 1. 處理色調字串 (去除前面的 emoji 和說明，只留括號內的英文)
+        # 例如取 "Medical Blue & White"
+        import re
+        color_keywords = re.search(r'\((.*?)\)', color_theme).group(1)
+
+        # 2. 設定場景魔法詞 (Magic Words)
+        if "衛教" in scenario or "患者" in scenario:
+            magic_words = "lifestyle photography, natural lighting, candid moment, high quality"
+        elif "醫護" in scenario:
+            magic_words = "clinical accuracy, professional atmosphere, macro details, depth of field"
+        elif "品牌" in scenario:
+            magic_words = "cinematic lighting, abstract concept, award winning photography, 8k"
+        else:
+            magic_words = "high quality, sharp focus"
+
+        # 3. 🇹🇼 在地化鎖定 (Localization Lock)
+        # 這是關鍵：強制加入台灣/亞洲特徵
+        localization_keywords = "Taiwanese people, East Asian ethnicity, modern Taipei city vibe, asian features"
+
+        # 4. 組合最終指令
+        # 結構：Subject + Context + Style + Color + Localization + Tech Specs
+        final_prompt = (
+            f"/imagine prompt: "
+            f"**Subject:** {main_subject}. "
+            f"**Context:** {scenario}. "
+            f"**Style:** {style}. "
+            f"**Atmosphere:** {color_keywords}. "
+            f"**Character:** {localization_keywords}. "  # 強制插入
+            f"**Tech Specs:** {magic_words} "
+            f"{ar_map[ar_label]} --v 6.0 --stylize 250"
+        )
+        
+        if compliance_check:
+            final_prompt += f" {negative_prompt}"
+
+        # --- 7. 結果呈現 ---
+        st.divider()
+        st.success("🎉 Prompt 已生成！(已優化為台灣風格)")
+        st.code(final_prompt, language="markdown")
+        
+        # 預覽提示
+        st.caption("💡 小撇步：這段指令已包含 `Taiwanese people` 參數，Midjourney 產出的人物將會非常符合台灣在地情境。")
